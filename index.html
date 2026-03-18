@@ -1,0 +1,2483 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MR Board · Image Upload Pro</title>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: #0a0e1a;
+            font-family: -apple-system, 'Inter', 'SF Pro Display', 'Helvetica Neue', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Full Screen Mode */
+        body.full-screen-mode .toolbar,
+        body.full-screen-mode .bottom-bar,
+        body.full-screen-mode .pen-tab,
+        body.full-screen-mode .coord-panel,
+        body.full-screen-mode .more-menu,
+        body.full-screen-mode .room-box {
+            display: none !important;
+            opacity: 0;
+            transform: scale(0.9);
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        body.full-screen-mode .fullscreen-btn {
+            display: flex !important;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 60px;
+            background: rgba(20, 28, 45, 0.9);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        body.full-screen-mode .fullscreen-btn:active {
+            transform: scale(0.95);
+            background: rgba(30, 40, 60, 0.95);
+        }
+
+        .fullscreen-btn {
+            display: none;
+        }
+
+        /* Welcome Page */
+        #welcome-page {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 30%, #1e2a40, #080e1a);
+            z-index: 2000;
+            padding: 16px;
+            transition: opacity 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .welcome-card {
+            background: rgba(22, 30, 48, 0.96);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            padding: 40px 32px;
+            border-radius: 70px;
+            border: 1px solid rgba(255,255,255,0.08);
+            text-align: center;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8);
+            transform: translateY(0);
+            transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease;
+            animation: cardFloat 0.5s ease-out;
+        }
+
+        @keyframes cardFloat {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .welcome-card h1 {
+            font-size: 58px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00f2fe, #a07aff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1;
+            margin-bottom: 10px;
+            letter-spacing: -1px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 18px;
+            border-radius: 60px;
+            border: none;
+            background: #00f2fe;
+            color: #000;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 16px 0;
+            box-shadow: 0 8px 30px rgba(0,242,254,0.4);
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+            box-shadow: 0 4px 15px rgba(0,242,254,0.5);
+        }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 18px;
+            border-radius: 60px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 8px 0;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:active {
+            transform: scale(0.97);
+            background: rgba(255,255,255,0.15);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 18px;
+            border-radius: 60px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.4);
+            color: white;
+            text-align: center;
+            font-size: 16px;
+            outline: none;
+            margin: 10px 0;
+            -webkit-appearance: none;
+            transition: border 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .input-field:focus {
+            border-color: #00f2fe;
+            box-shadow: 0 0 0 3px rgba(0,242,254,0.2);
+        }
+
+        #app-page {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            opacity: 0;
+            animation: appFadeIn 0.4s ease forwards;
+        }
+
+        @keyframes appFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: pinch-zoom;
+            cursor: crosshair;
+            transition: background-color 0.3s ease;
+        }
+
+        /* ========== PAINTING TOOLBAR ========== */
+        .toolbar {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%) scale(1);
+            background: rgba(22, 30, 48, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            padding: 8px 12px;
+            border-radius: 60px;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 6px;
+            z-index: 1000;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.3s ease;
+            animation: toolbarSlideDown 0.4s ease-out;
+        }
+
+        @keyframes toolbarSlideDown {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        .tool-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 48px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tool-btn:active {
+            background: rgba(255,255,255,0.15);
+            transform: scale(0.92);
+        }
+
+        .tool-btn.active {
+            color: #00f2fe;
+            background: rgba(0,242,254,0.2);
+        }
+
+        .color-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 40px;
+            padding: 4px 8px 4px 4px;
+            margin-right: 4px;
+            transition: background 0.2s ease;
+        }
+
+        .color-wrapper:active {
+            background: rgba(0,0,0,0.5);
+        }
+
+        .color-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid white;
+            background: #00f2fe;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0,242,254,0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .color-circle:active {
+            transform: scale(0.95);
+            box-shadow: 0 0 20px rgba(0,242,254,0.5);
+        }
+
+        .undo-redo-group {
+            display: flex;
+            gap: 4px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 40px;
+            padding: 4px;
+            margin-left: 4px;
+            transition: background 0.2s ease;
+        }
+
+        /* ========== BOTTOM BAR ========== */
+        .bottom-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            pointer-events: none;
+            animation: bottomBarSlideUp 0.4s ease-out;
+        }
+
+        @keyframes bottomBarSlideUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .room-box {
+            background: rgba(22, 30, 48, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+            transition: transform 0.2s ease, background 0.2s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .room-box:active {
+            transform: scale(0.98);
+            background: rgba(30, 40, 60, 0.9);
+        }
+
+        .room-id {
+            display: none;
+        }
+
+        .copy-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #00f2fe;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .copy-btn:active {
+            background: rgba(255,255,255,0.25);
+            transform: scale(0.9);
+        }
+
+        .right-group {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .menu-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 48px;
+            background: rgba(22, 30, 48, 0.85);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .menu-btn:active {
+            transform: scale(0.92);
+            background: rgba(40, 50, 70, 0.9);
+        }
+
+        /* ========== MORE MENU ========== */
+        .more-menu {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 40px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px;
+            display: none;
+            flex-direction: column;
+            min-width: 280px;
+            max-width: calc(100vw - 40px);
+            z-index: 1500;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            transform-origin: bottom right;
+            animation: menuPop 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        @keyframes menuPop {
+            0% { opacity: 0; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .more-menu.show {
+            display: flex;
+        }
+
+        .menu-header {
+            padding: 14px 18px 8px;
+            color: rgba(255,255,255,0.4);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .menu-item {
+            padding: 16px 18px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            font-size: 15px;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .menu-item:active {
+            background: rgba(255,255,255,0.1);
+            transform: scale(0.98);
+        }
+
+        .menu-item i {
+            width: 22px;
+            color: #00f2fe;
+            transition: transform 0.2s ease;
+        }
+
+        .menu-item:active i {
+            transform: scale(0.9);
+        }
+
+        .menu-item.danger {
+            color: #ff7b7b;
+        }
+
+        .menu-item.danger i {
+            color: #ff7b7b;
+        }
+
+        .menu-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 10px 0;
+        }
+
+        .user-count-badge {
+            margin-left: auto;
+            background: rgba(0,242,254,0.15);
+            padding: 6px 14px;
+            border-radius: 30px;
+            color: #00f2fe;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        /* ========== PEN SETTINGS ========== */
+        .pen-tab {
+            position: fixed;
+            bottom: 90px;
+            left: 20px;
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 40px;
+            border: 1px solid rgba(0,242,254,0.2);
+            width: 340px;
+            max-width: calc(100vw - 40px);
+            z-index: 1400;
+            display: none;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            transform-origin: bottom left;
+            animation: menuPop 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .pen-tab.show {
+            display: block;
+        }
+
+        .tab-header {
+            display: flex;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .tab-item {
+            flex: 1;
+            padding: 18px;
+            text-align: center;
+            cursor: pointer;
+            color: rgba(255,255,255,0.6);
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tab-item:active {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .tab-item.active {
+            color: #00f2fe;
+            border-bottom: 2px solid #00f2fe;
+        }
+
+        .tab-content {
+            padding: 24px;
+        }
+
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .slider-container {
+            margin-bottom: 24px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            -webkit-appearance: none;
+            transition: background 0.2s ease;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 26px;
+            height: 26px;
+            background: #00f2fe;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 0 15px rgba(0,242,254,0.5);
+            transition: transform 0.1s ease;
+        }
+
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.15);
+        }
+
+        /* ========== PEN TYPES - PURE SVG ICONS ========== */
+        .pen-types-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .pen-type-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 28px;
+            padding: 18px 12px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px;
+        }
+
+        .pen-type-card:active {
+            background: rgba(255,255,255,0.15);
+            transform: scale(0.94);
+        }
+
+        .pen-type-card.active {
+            border-color: #00f2fe;
+            background: rgba(0,242,254,0.15);
+            box-shadow: 0 0 20px rgba(0,242,254,0.3);
+        }
+
+        .pen-type-card i {
+            width: 32px;
+            height: 32px;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .pen-type-card.active i {
+            color: #00f2fe;
+            transform: scale(1.1);
+        }
+
+        /* Text Size Modal */
+        .text-size-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            padding: 16px;
+        }
+
+        .text-size-modal.show {
+            display: flex;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        .text-size-content {
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 60px;
+            padding: 36px 28px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid rgba(0,242,254,0.3);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            animation: modalContentPop 0.3s ease forwards;
+        }
+
+        .text-size-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .text-size-slider {
+            width: 100%;
+            margin: 30px 0;
+        }
+
+        .text-size-value {
+            text-align: center;
+            color: #00f2fe;
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .text-size-presets {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .text-size-preset {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 30px;
+            padding: 12px;
+            text-align: center;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .text-size-preset:active {
+            background: rgba(255,255,255,0.15);
+            transform: scale(0.95);
+        }
+
+        .text-size-preset.active {
+            background: #00f2fe;
+            color: #000;
+            border-color: #00f2fe;
+        }
+
+        /* ========== COORD PANEL ========== */
+        .coord-panel {
+            position: fixed;
+            bottom: 90px;
+            right: 80px;
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 30px;
+            border: 1px solid rgba(0,242,254,0.2);
+            padding: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 1400;
+            min-width: 220px;
+            max-width: calc(100vw - 100px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8);
+            transform-origin: bottom right;
+            animation: menuPop 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        .coord-panel.show {
+            display: flex;
+        }
+
+        .coord-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: white;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+        }
+
+        .coord-value {
+            color: #00f2fe;
+            font-weight: 600;
+        }
+
+        /* ========== MODALS ========== */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border-radius: 60px;
+            padding: 36px 28px;
+            width: 100%;
+            max-width: 440px;
+            border: 1px solid rgba(0,242,254,0.3);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            animation: modalContentPop 0.3s ease forwards;
+        }
+
+        @keyframes modalContentPop {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 24px;
+            text-align: center;
+            letter-spacing: -0.5px;
+        }
+
+        .modal-subtitle {
+            color: rgba(255,255,255,0.7);
+            font-size: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 18px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.4);
+            color: white;
+            font-size: 16px;
+            margin-bottom: 20px;
+            outline: none;
+            text-align: center;
+            -webkit-appearance: none;
+            transition: border 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .password-input:focus {
+            border-color: #00f2fe;
+            box-shadow: 0 0 0 3px rgba(0,242,254,0.2);
+        }
+
+        .color-picker-modal {
+            width: 100%;
+            height: 60px;
+            border-radius: 40px;
+            border: 2px solid #00f2fe;
+            background: transparent;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .color-picker-modal:active {
+            transform: scale(0.98);
+        }
+
+        .code-box {
+            background: rgba(0,0,0,0.4);
+            border-radius: 30px;
+            padding: 18px;
+            margin-bottom: 20px;
+            border: 1px solid #00f2fe;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            color: #00f2fe;
+            word-break: break-all;
+            text-align: center;
+            transition: background 0.2s ease;
+        }
+
+        .code-box:active {
+            background: rgba(0,0,0,0.6);
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 40px;
+            transition: background 0.2s ease;
+        }
+
+        .checkbox-container:active {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .checkbox-container input {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            accent-color: #00f2fe;
+        }
+
+        .checkbox-container span {
+            color: white;
+            font-size: 15px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 18px;
+            border-radius: 50px;
+            border: none;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .modal-btn:active {
+            transform: scale(0.96);
+        }
+
+        .modal-btn-primary {
+            background: #00f2fe;
+            color: #000;
+            box-shadow: 0 8px 20px rgba(0,242,254,0.3);
+        }
+
+        .modal-btn-primary:active {
+            box-shadow: 0 4px 10px rgba(0,242,254,0.4);
+        }
+
+        .modal-btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .modal-btn-secondary:active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        #textInput {
+            position: fixed;
+            background: rgba(26, 35, 53, 0.95);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 2px solid #00f2fe;
+            color: white;
+            font-size: 18px;
+            padding: 16px 20px;
+            border-radius: 50px;
+            outline: none;
+            display: none;
+            z-index: 2000;
+            width: 90%;
+            max-width: 320px;
+            left: 50%;
+            top: 30%;
+            transform: translateX(-50%) scale(0.9);
+            text-align: center;
+            animation: inputPop 0.25s ease forwards;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8);
+        }
+
+        @keyframes inputPop {
+            to { transform: translateX(-50%) scale(1); }
+        }
+
+        /* Mobile specific */
+        @media (max-width: 600px) {
+            .tool-btn { width: 44px; height: 44px; }
+            .color-circle { width: 36px; height: 36px; }
+            .menu-btn { width: 44px; height: 44px; }
+            .room-box { padding: 8px 12px; }
+            .copy-btn { width: 36px; height: 36px; }
+            .more-menu { min-width: 260px; }
+            .pen-tab { width: 300px; }
+            .modal-title { font-size: 24px; }
+            .pen-type-card { padding: 14px 8px; }
+            .pen-type-card i { width: 28px; height: 28px; }
+        }
+
+        /* Safe area for notched phones */
+        @supports (padding: max(0px)) {
+            .bottom-bar {
+                bottom: max(20px, env(safe-area-inset-bottom));
+                left: max(20px, env(safe-area-inset-left));
+                right: max(20px, env(safe-area-inset-right));
+            }
+            
+            .toolbar {
+                top: max(16px, env(safe-area-inset-top));
+            }
+            
+            .more-menu {
+                bottom: max(90px, env(safe-area-inset-bottom) + 70px);
+                right: max(20px, env(safe-area-inset-right) + 10px);
+            }
+            
+            .pen-tab {
+                bottom: max(90px, env(safe-area-inset-bottom) + 70px);
+                left: max(20px, env(safe-area-inset-left) + 10px);
+            }
+        }
+
+        /* Prevent browser lag */
+        .toolbar, .bottom-bar, .more-menu, .pen-tab, .coord-panel, .modal-content {
+            will-change: transform, opacity;
+        }
+    </style>
+</head>
+<body>
+
+<!-- WELCOME PAGE -->
+<div id="welcome-page">
+    <div class="welcome-card">
+        <h1>MR</h1>
+        <p style="color: rgba(255,255,255,0.5); margin-bottom: 30px;">image upload · live sync</p>
+        
+        <button class="btn-primary" onclick="showCreateRoomModal()">
+            <i data-lucide="plus-circle" style="vertical-align: middle; margin-right: 8px;" size="20"></i>
+            Yangi xona yaratish
+        </button>
+        
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 25px 0 20px;"></div>
+        
+        <input type="text" id="roomInput" class="input-field" placeholder="Xona ID" value="demo">
+        <button class="btn-secondary" onclick="showJoinRoomModal()">
+            <i data-lucide="log-in" style="vertical-align: middle; margin-right: 8px;" size="18"></i>
+            Xonaga kirish
+        </button>
+        
+        <p style="margin-top: 35px; font-size: 13px; opacity: 0.4;">Muhammadrasul · image pro</p>
+    </div>
+</div>
+
+<!-- CREATE ROOM MODAL -->
+<div class="modal" id="createRoomModal">
+    <div class="modal-content">
+        <div class="modal-title">Yangi xona yaratish</div>
+        
+        <input type="text" class="password-input" id="newRoomName" placeholder="Xona nomi" value="MR Board">
+        
+        <div style="color: rgba(255,255,255,0.7); font-size: 15px; margin-bottom: 12px;">Doska rangini tanlang:</div>
+        <input type="color" id="boardColorPicker" class="color-picker-modal" value="#0a0e1a">
+        
+        <div class="checkbox-container" onclick="togglePasswordField()">
+            <input type="checkbox" id="enablePasswordCheckbox">
+            <span>Xonani parol bilan himoyalash</span>
+        </div>
+        
+        <input type="password" id="roomPassword" class="password-input" placeholder="Parol" style="display: none;" disabled>
+        
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" onclick="createRoomWithPassword()">Yaratish</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal('createRoomModal')">Bekor</button>
+        </div>
+    </div>
+</div>
+
+<!-- JOIN ROOM MODAL -->
+<div class="modal" id="joinRoomModal">
+    <div class="modal-content">
+        <div class="modal-title">Xonaga kirish</div>
+        
+        <div class="modal-subtitle" id="joinRoomName">demo</div>
+        
+        <input type="password" id="joinPassword" class="password-input" placeholder="Parol (agar kerak bo'lsa)">
+        
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" onclick="joinRoomWithPassword()">Kirish</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal('joinRoomModal')">Bekor</button>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE ROOM MODAL -->
+<div class="modal" id="deleteRoomModal">
+    <div class="modal-content">
+        <div class="modal-title">Xonani o'chirish</div>
+        
+        <div class="modal-subtitle">Bu xona butunlay o'chiriladi! Parolni kiriting:</div>
+        
+        <input type="password" id="deletePassword" class="password-input" placeholder="Parol">
+        
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" onclick="verifyPasswordAndDelete()">O'chirish</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal('deleteRoomModal')">Bekor</button>
+        </div>
+    </div>
+</div>
+
+<!-- PASSWORD MODAL (for clear board) -->
+<div class="modal" id="passwordModal">
+    <div class="modal-content">
+        <div class="modal-title">Parol talab qilinadi</div>
+        
+        <div class="modal-subtitle">Bu amalni bajarish uchun xona parolini kiriting</div>
+        
+        <input type="password" id="actionPassword" class="password-input" placeholder="Parol">
+        
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" onclick="verifyPasswordAndClear()">Tasdiqlash</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeModal('passwordModal')">Bekor</button>
+        </div>
+    </div>
+</div>
+
+<!-- TEXT SIZE MODAL -->
+<div class="text-size-modal" id="textSizeModal">
+    <div class="text-size-content">
+        <div class="text-size-title">Matn o'lchami</div>
+        
+        <div class="text-size-value" id="textSizeValue">250%</div>
+        
+        <input type="range" id="textSizeSlider" class="text-size-slider" min="20" max="500" value="250" step="10">
+        
+        <div class="text-size-presets">
+            <div class="text-size-preset" onclick="setTextSize(100)">100%</div>
+            <div class="text-size-preset active" onclick="setTextSize(250)">250%</div>
+            <div class="text-size-preset" onclick="setTextSize(400)">400%</div>
+        </div>
+        
+        <div class="modal-buttons">
+            <button class="modal-btn modal-btn-primary" onclick="applyTextSize()">Saqlash</button>
+            <button class="modal-btn modal-btn-secondary" onclick="closeTextSizeModal()">Bekor</button>
+        </div>
+    </div>
+</div>
+
+<!-- APP PAGE -->
+<div id="app-page">
+    <!-- Full Screen Button -->
+    <div class="fullscreen-btn" onclick="toggleFullScreen()">
+        <i data-lucide="minimize-2" size="28"></i>
+    </div>
+
+    <!-- PAINTING TOOLBAR -->
+    <div class="toolbar">
+        <div class="color-wrapper">
+            <div class="color-circle" id="colorCircle" onclick="document.getElementById('colorPicker').click()"></div>
+            <input type="color" id="colorPicker" value="#00f2fe" style="display: none;">
+        </div>
+        
+        <button class="tool-btn active" id="btn-draw" onclick="setTool('draw')" title="Qalam">
+            <i data-lucide="pencil" size="20"></i>
+        </button>
+        
+        <button class="tool-btn" id="btn-erase" onclick="setTool('erase')" title="O'chirg'ich">
+            <i data-lucide="eraser" size="20"></i>
+        </button>
+        
+        <button class="tool-btn" id="btn-pan" onclick="setTool('pan')" title="Siljitish">
+            <i data-lucide="hand" size="20"></i>
+        </button>
+        
+        <button class="tool-btn" id="btn-text" onclick="showTextSizeModal()" title="Matn">
+            <i data-lucide="type" size="20"></i>
+        </button>
+
+        <div class="undo-redo-group">
+            <button class="tool-btn" onclick="undo()" title="Bekor qilish">
+                <i data-lucide="corner-up-left" size="20"></i>
+            </button>
+            <button class="tool-btn" onclick="redo()" title="Qaytarish">
+                <i data-lucide="corner-up-right" size="20"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- BOTTOM BAR -->
+    <div class="bottom-bar">
+        <div class="room-box">
+            <span class="room-id" id="roomDisplay">XONA</span>
+            <button class="copy-btn" onclick="copyRoomId()" title="ID nusxalash">
+                <i data-lucide="copy" size="18"></i>
+            </button>
+        </div>
+        
+        <div class="right-group">
+            <div class="menu-btn" onclick="togglePenTab()" title="Qalam sozlamalari">
+                <i data-lucide="pen-tool" size="20"></i>
+            </div>
+            <div class="menu-btn" onclick="toggleCoordPanel()" title="Koordinatalar">
+                <i data-lucide="move-3d" size="20"></i>
+            </div>
+            <div class="menu-btn" onclick="toggleMoreMenu()" title="Menyu">
+                <i data-lucide="more-vertical" size="20"></i>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MORE MENU (3 DOTS) -->
+    <div class="more-menu" id="moreMenu">
+        <div class="menu-header">XONA</div>
+        
+        <div class="menu-item" onclick="showRoomInfo()">
+            <i data-lucide="info" size="20"></i>
+            <span>Xona haqida</span>
+            <span class="user-count-badge" id="menuUserCount">+0</span>
+        </div>
+        
+        <div class="menu-item" onclick="copyRoomLink()">
+            <i data-lucide="link" size="20"></i>
+            <span>Link nusxalash</span>
+        </div>
+        
+        <div class="menu-divider"></div>
+        <div class="menu-header">ASOSIY</div>
+        
+        <!-- IMAGE UPLOAD BUTTON -->
+        <div class="menu-item" onclick="uploadImage()">
+            <i data-lucide="image" size="20"></i>
+            <span>Rasm yuklash</span>
+        </div>
+        
+        <div class="menu-item" onclick="toggleFullScreen()">
+            <i data-lucide="maximize-2" size="20"></i>
+            <span>To'liq ekran</span>
+        </div>
+        
+        <div class="menu-item" onclick="showExportModal()">
+            <i data-lucide="download" size="20"></i>
+            <span>Rasm saqlash</span>
+        </div>
+        
+        <div class="menu-divider"></div>
+        <div class="menu-header">BOSHQARUV</div>
+        
+        <div class="menu-item" onclick="showClearPasswordModal()">
+            <i data-lucide="trash-2" size="20"></i>
+            <span>Doskani tozalash</span>
+        </div>
+        
+        <div class="menu-item danger" onclick="showDeleteRoomModal()">
+            <i data-lucide="trash" size="20"></i>
+            <span>Xonani o'chirish</span>
+        </div>
+        
+        <div class="menu-divider"></div>
+        
+        <div class="menu-item danger" onclick="exitToHome()">
+            <i data-lucide="log-out" size="20"></i>
+            <span>Chiqish</span>
+        </div>
+    </div>
+    
+    <!-- PEN SETTINGS -->
+    <div class="pen-tab" id="penTab">
+        <div class="tab-header">
+            <div class="tab-item active" onclick="switchTab('basic')">Asosiy</div>
+            <div class="tab-item" onclick="switchTab('pen-types')">Qalam turlari</div>
+        </div>
+        
+        <div class="tab-content">
+            <div class="tab-pane active" id="tab-basic">
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Qalinlik</span>
+                        <span id="sizeValue">4px</span>
+                    </div>
+                    <input type="range" id="penSize" min="1" max="20" value="4">
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Shaffoflik</span>
+                        <span id="opacityValue">100%</span>
+                    </div>
+                    <input type="range" id="penOpacity" min="0.1" max="1" step="0.1" value="1">
+                </div>
+            </div>
+            
+            <div class="tab-pane" id="tab-pen-types">
+                <div class="pen-types-grid">
+                    <!-- Pure SVG Icons - No text -->
+                    <div class="pen-type-card active" onclick="selectPenType(0)" title="Oddiy qalam">
+                        <i data-lucide="pen-tool" width="32" height="32"></i>
+                    </div>
+                    <div class="pen-type-card" onclick="selectPenType(1)" title="Marker">
+                        <i data-lucide="pen-line" width="32" height="32"></i>
+                    </div>
+                    <div class="pen-type-card" onclick="selectPenType(2)" title="Kaligrafiya">
+                        <i data-lucide="brush" width="32" height="32"></i>
+                    </div>
+                    <div class="pen-type-card" onclick="selectPenType(3)" title="Rolley">
+                        <i data-lucide="circle-dot" width="32" height="32"></i>
+                    </div>
+                    <div class="pen-type-card" onclick="selectPenType(4)" title="Havo qalam">
+                        <i data-lucide="cloud" width="32" height="32"></i>
+                    </div>
+                    <div class="pen-type-card" onclick="selectPenType(5)" title="Yorqin">
+                        <i data-lucide="sparkles" width="32" height="32"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- COORD PANEL -->
+    <div class="coord-panel" id="coordPanel">
+        <div class="coord-item">
+            <span>Mouse (screen)</span>
+            <span class="coord-value" id="mouseScreen">0, 0</span>
+        </div>
+        <div class="coord-item">
+            <span>Mouse (world)</span>
+            <span class="coord-value" id="mouseWorld">0, 0</span>
+        </div>
+        <div class="coord-item">
+            <span>Offset</span>
+            <span class="coord-value" id="offsetVal">0, 0</span>
+        </div>
+        <div class="coord-item">
+            <span>Zoom</span>
+            <span class="coord-value" id="zoomDisplay">250%</span>
+        </div>
+    </div>
+    
+    <!-- EXPORT MODAL -->
+    <div class="modal" id="exportModal">
+        <div class="modal-content">
+            <div class="modal-title">Rasm saqlash</div>
+            <input type="text" class="password-input" id="exportName" placeholder="Fayl nomi" value="my_drawing">
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-primary" onclick="exportAsPNG()">PNG</button>
+                <button class="modal-btn modal-btn-primary" onclick="exportAsJPG()">JPG</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('exportModal')">Bekor</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ROOM INFO MODAL -->
+    <div class="modal" id="roomInfoModal">
+        <div class="modal-content">
+            <div class="modal-title">Xona haqida</div>
+            <div style="background:rgba(0,0,0,0.3); border-radius:30px; padding:20px; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+                    <span style="color:rgba(255,255,255,0.5);">Xona ID:</span>
+                    <span style="color:#00f2fe; font-weight:600; font-size:16px;" id="infoRoomId">-</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:16px;">
+                    <span style="color:rgba(255,255,255,0.5);">Parol:</span>
+                    <span style="color:#00f2fe; font-weight:600;" id="infoHasPassword">Yo'q</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:rgba(255,255,255,0.5);">Foydalanuvchilar:</span>
+                    <span style="color:#00f2fe; font-weight:600;" id="infoUserCount">0</span>
+                </div>
+            </div>
+            
+            <div style="margin-bottom:20px;">
+                <div style="color:rgba(255,255,255,0.5); font-size:13px; margin-bottom:10px;">Xona linki:</div>
+                <div class="code-box" id="roomLinkCode" onclick="copyRoomLinkFromBox()">https://...</div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-primary" onclick="copyRoomLink()">Link nusxalash</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('roomInfoModal')">Yopish</button>
+            </div>
+        </div>
+    </div>
+    
+    <input type="text" id="textInput" placeholder="Matn yozing...">
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+    // ==================== FIREBASE ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDvbG7fChb2LN_nJhwTF1iMKMXNPcuGk5Y",
+        authDomain: "tictactoe-26434.firebaseapp.com",
+        databaseURL: "https://tictactoe-26434-default-rtdb.firebaseio.com",
+        projectId: "tictactoe-26434",
+        storageBucket: "tictactoe-26434.firebasestorage.app",
+        messagingSenderId: "763173543438",
+        appId: "1:763173543438:web:f89e60befddcc19b59a65f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    lucide.createIcons();
+
+    // ==================== LOCAL STORAGE KEYS ====================
+    const STORAGE_KEYS = {
+        TEXT_SIZE: 'mr_board_text_size',
+        PEN_SIZE: 'mr_board_pen_size',
+        PEN_OPACITY: 'mr_board_pen_opacity',
+        PEN_TYPE: 'mr_board_pen_type',
+        COLOR: 'mr_board_color',
+        ZOOM: 'mr_board_zoom',
+        OFFSET_X: 'mr_board_offset_x',
+        OFFSET_Y: 'mr_board_offset_y'
+    };
+
+    // ==================== MOBILE DETECTION ====================
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const touchSettings = {
+        minDistance: isMobile ? 5 : 2,
+        longPressDelay: isMobile ? 500 : 300,
+        doubleTapDelay: 300,
+        hapticFeedback: isMobile && window.navigator.vibrate ? true : false
+    };
+
+    // ==================== CANVAS ====================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d', { alpha: true });
+
+    // Image cache for better performance
+    const imageCache = new Map();
+
+    // ==================== STATE ====================
+    const state = {
+        userId: 'user_' + Math.random().toString(36).substr(2, 8),
+        tool: 'draw',
+        isDrawing: false,
+        isDraggingImage: false,
+        draggedImageId: null,
+        dragOffset: { x: 0, y: 0 },
+        scale: parseFloat(localStorage.getItem(STORAGE_KEYS.ZOOM)) || 2.5,
+        offset: { 
+            x: parseFloat(localStorage.getItem(STORAGE_KEYS.OFFSET_X)) || 0,
+            y: parseFloat(localStorage.getItem(STORAGE_KEYS.OFFSET_Y)) || 0 
+        },
+        elements: [],
+        activePaths: {},
+        roomId: '',
+        roomRef: null,
+        boardColor: '#0a0e1a',
+        hasPassword: false,
+        roomPassword: '',
+        lastMouse: { x: 0, y: 0 },
+        mousePos: { x: 0, y: 0 },
+        userCount: 0,
+        fullScreen: false,
+        history: [],
+        historyIndex: -1,
+        lastTap: 0,
+        touchCount: 0,
+        longPressTimer: null,
+        pinchInitialDistance: 0,
+        textSize: parseInt(localStorage.getItem(STORAGE_KEYS.TEXT_SIZE)) || 250
+    };
+
+    // ==================== PEN SETTINGS ====================
+    const penSettings = {
+        size: parseInt(localStorage.getItem(STORAGE_KEYS.PEN_SIZE)) || 4,
+        opacity: parseFloat(localStorage.getItem(STORAGE_KEYS.PEN_OPACITY)) || 1,
+        type: parseInt(localStorage.getItem(STORAGE_KEYS.PEN_TYPE)) || 0,
+        color: localStorage.getItem(STORAGE_KEYS.COLOR) || '#00f2fe'
+    };
+
+    // ==================== INIT ====================
+    document.getElementById('colorPicker').addEventListener('input', (e) => {
+        penSettings.color = e.target.value;
+        document.getElementById('colorCircle').style.background = e.target.value;
+        localStorage.setItem(STORAGE_KEYS.COLOR, e.target.value);
+        vibrate();
+    });
+
+    document.getElementById('penSize').addEventListener('input', (e) => {
+        penSettings.size = parseInt(e.target.value);
+        document.getElementById('sizeValue').innerText = penSettings.size + 'px';
+        localStorage.setItem(STORAGE_KEYS.PEN_SIZE, penSettings.size);
+    });
+
+    document.getElementById('penOpacity').addEventListener('input', (e) => {
+        penSettings.opacity = parseFloat(e.target.value);
+        document.getElementById('opacityValue').innerText = Math.round(penSettings.opacity * 100) + '%';
+        localStorage.setItem(STORAGE_KEYS.PEN_OPACITY, penSettings.opacity);
+    });
+
+    document.getElementById('boardColorPicker').addEventListener('input', (e) => {
+        document.getElementById('selectedColorText').innerText = e.target.value;
+    });
+
+    document.getElementById('textSizeSlider').addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        document.getElementById('textSizeValue').innerText = value + '%';
+        
+        document.querySelectorAll('.text-size-preset').forEach(el => el.classList.remove('active'));
+        if (value === 100) document.querySelectorAll('.text-size-preset')[0].classList.add('active');
+        else if (value === 250) document.querySelectorAll('.text-size-preset')[1].classList.add('active');
+        else if (value === 400) document.querySelectorAll('.text-size-preset')[2].classList.add('active');
+    });
+
+    // ==================== VIBRATE ====================
+    function vibrate() {
+        if (touchSettings.hapticFeedback) {
+            window.navigator.vibrate(10);
+        }
+    }
+
+    // ==================== PASSWORD TOGGLE ====================
+    function togglePasswordField() {
+        const checkbox = document.getElementById('enablePasswordCheckbox');
+        const passwordField = document.getElementById('roomPassword');
+        
+        if (checkbox.checked) {
+            passwordField.style.display = 'block';
+            passwordField.disabled = false;
+            passwordField.focus();
+        } else {
+            passwordField.style.display = 'none';
+            passwordField.disabled = true;
+            passwordField.value = '';
+        }
+    }
+
+    // ==================== PEN TYPE ====================
+    function selectPenType(index) {
+        penSettings.type = index;
+        localStorage.setItem(STORAGE_KEYS.PEN_TYPE, index);
+        
+        document.querySelectorAll('.pen-type-card').forEach((el, i) => {
+            if (i === index) {
+                el.classList.add('active');
+                const icon = el.querySelector('i');
+                if (icon) {
+                    icon.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        icon.style.transform = 'scale(1)';
+                    }, 200);
+                }
+            } else {
+                el.classList.remove('active');
+            }
+        });
+        vibrate();
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+        
+        if (tab === 'basic') {
+            document.querySelectorAll('.tab-item')[0].classList.add('active');
+            document.getElementById('tab-basic').classList.add('active');
+        } else {
+            document.querySelectorAll('.tab-item')[1].classList.add('active');
+            document.getElementById('tab-pen-types').classList.add('active');
+        }
+    }
+
+    // ==================== TEXT SIZE ====================
+    function showTextSizeModal() {
+        document.getElementById('textSizeSlider').value = state.textSize;
+        document.getElementById('textSizeValue').innerText = state.textSize + '%';
+        
+        document.querySelectorAll('.text-size-preset').forEach(el => el.classList.remove('active'));
+        if (state.textSize === 100) document.querySelectorAll('.text-size-preset')[0].classList.add('active');
+        else if (state.textSize === 250) document.querySelectorAll('.text-size-preset')[1].classList.add('active');
+        else if (state.textSize === 400) document.querySelectorAll('.text-size-preset')[2].classList.add('active');
+        
+        document.getElementById('textSizeModal').classList.add('show');
+    }
+
+    function setTextSize(size) {
+        document.getElementById('textSizeSlider').value = size;
+        document.getElementById('textSizeValue').innerText = size + '%';
+        
+        document.querySelectorAll('.text-size-preset').forEach(el => el.classList.remove('active'));
+        if (size === 100) document.querySelectorAll('.text-size-preset')[0].classList.add('active');
+        else if (size === 250) document.querySelectorAll('.text-size-preset')[1].classList.add('active');
+        else if (size === 400) document.querySelectorAll('.text-size-preset')[2].classList.add('active');
+    }
+
+    function applyTextSize() {
+        state.textSize = parseInt(document.getElementById('textSizeSlider').value);
+        localStorage.setItem(STORAGE_KEYS.TEXT_SIZE, state.textSize);
+        closeTextSizeModal();
+        scheduleRender();
+    }
+
+    function closeTextSizeModal() {
+        document.getElementById('textSizeModal').classList.remove('show');
+    }
+
+    // ==================== IMAGE UPLOAD ====================
+    function uploadImage() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Check file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Rasm hajmi 5MB dan kichik bo\'lishi kerak');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target.result;
+                
+                // Get image dimensions
+                const img = new Image();
+                img.onload = () => {
+                    // Calculate position (center of current view)
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height / 2;
+                    const world = getWorld(centerX, centerY);
+                    
+                    // Calculate size (max 400px width/height while keeping aspect ratio)
+                    let width = img.width;
+                    let height = img.height;
+                    const maxSize = 400;
+                    
+                    if (width > height && width > maxSize) {
+                        height = (height / width) * maxSize;
+                        width = maxSize;
+                    } else if (height > maxSize) {
+                        width = (width / height) * maxSize;
+                        height = maxSize;
+                    }
+                    
+                    // Convert to world coordinates
+                    width = width / state.scale;
+                    height = height / state.scale;
+                    
+                    const imageElement = {
+                        id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                        type: 'image',
+                        data: base64,
+                        x: world.x - width / 2,
+                        y: world.y - height / 2,
+                        width: width,
+                        height: height,
+                        originalWidth: img.width,
+                        originalHeight: img.height,
+                        userId: state.userId,
+                        timestamp: Date.now()
+                    };
+                    
+                    // Cache the image
+                    const cacheImg = new Image();
+                    cacheImg.src = base64;
+                    imageCache.set(imageElement.id, cacheImg);
+                    
+                    // Save to Firebase
+                    state.roomRef.child('elements').push(imageElement);
+                    
+                    toggleMoreMenu(); // Close menu
+                    vibrate();
+                };
+                img.src = base64;
+            };
+            reader.readAsDataURL(file);
+        };
+        
+        input.click();
+    }
+
+    // ==================== GET PEN PROPERTIES ====================
+    function getPenProperties() {
+        let size = penSettings.size;
+        let opacity = penSettings.opacity;
+        let color = penSettings.color;
+        
+        switch(penSettings.type) {
+            case 1: // Marker
+                size *= 1.5;
+                opacity *= 0.7;
+                break;
+            case 2: // Calligraphy
+                break;
+            case 3: // Rolley - dotted
+                break;
+            case 4: // Air
+                opacity *= 0.4;
+                break;
+            case 5: // Bright
+                color = '#ffffff';
+                break;
+        }
+        
+        const hex = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+        const rgb = hex ? {
+            r: parseInt(hex[1], 16),
+            g: parseInt(hex[2], 16),
+            b: parseInt(hex[3], 16)
+        } : { r: 0, g: 242, b: 254 };
+        
+        return { size, finalColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`, type: penSettings.type };
+    }
+
+    // ==================== RESIZE ====================
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        scheduleRender();
+    }
+    window.addEventListener('resize', resize);
+
+    // ==================== COORDINATES ====================
+    function getWorld(x, y) {
+        return {
+            x: (x - state.offset.x) / state.scale,
+            y: (y - state.offset.y) / state.scale
+        };
+    }
+
+    function updateCoordDisplay(e) {
+        if (e) state.mousePos = { x: e.clientX, y: e.clientY };
+        const world = getWorld(state.mousePos.x, state.mousePos.y);
+        document.getElementById('mouseScreen').innerText = `${Math.round(state.mousePos.x)}, ${Math.round(state.mousePos.y)}`;
+        document.getElementById('mouseWorld').innerText = `${Math.round(world.x * 10) / 10}, ${Math.round(world.y * 10) / 10}`;
+        document.getElementById('offsetVal').innerText = `${Math.round(state.offset.x)}, ${Math.round(state.offset.y)}`;
+        document.getElementById('zoomDisplay').innerText = Math.round(state.scale * 100) + '%';
+        
+        localStorage.setItem(STORAGE_KEYS.ZOOM, state.scale);
+        localStorage.setItem(STORAGE_KEYS.OFFSET_X, state.offset.x);
+        localStorage.setItem(STORAGE_KEYS.OFFSET_Y, state.offset.y);
+    }
+
+    // ==================== RENDER ====================
+    let rafId = null;
+    function scheduleRender() {
+        if (!rafId) {
+            rafId = requestAnimationFrame(() => {
+                render();
+                rafId = null;
+            });
+        }
+    }
+
+    function render() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = state.boardColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.setTransform(state.scale, 0, 0, state.scale, state.offset.x, state.offset.y);
+        
+        // Draw all elements
+        state.elements.forEach(el => {
+            if (el.type === 'path') {
+                drawPath(el.points, el.color, el.size, el.penType);
+            } else if (el.type === 'text') {
+                ctx.fillStyle = el.color;
+                const textSize = (el.size || 20) * (state.textSize / 100);
+                ctx.font = `bold ${textSize}px 'Inter', monospace`;
+                ctx.fillText(el.text, el.x, el.y);
+            } else if (el.type === 'image') {
+                // Draw image from cache or load it
+                if (imageCache.has(el.id)) {
+                    ctx.drawImage(imageCache.get(el.id), el.x, el.y, el.width, el.height);
+                } else {
+                    const img = new Image();
+                    img.onload = () => {
+                        imageCache.set(el.id, img);
+                        ctx.drawImage(img, el.x, el.y, el.width, el.height);
+                    };
+                    img.src = el.data;
+                }
+            }
+        });
+        
+        // Draw active paths
+        Object.values(state.activePaths).forEach(pathData => {
+            if (pathData.points?.length > 1) {
+                drawPath(pathData.points, pathData.color, pathData.size, pathData.penType);
+            }
+        });
+        
+        updateCoordDisplay();
+    }
+
+    function drawPath(points, color, width, penType = 0) {
+        if (points.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        if (penType === 3) { // Rolley
+            ctx.setLineDash([5, 5]);
+        } else if (penType === 4) { // Air
+            ctx.setLineDash([2, 4]);
+        } else if (penType === 5) { // Bright
+            ctx.shadowColor = '#00f2fe';
+            ctx.shadowBlur = 10;
+        } else {
+            ctx.setLineDash([]);
+            ctx.shadowBlur = 0;
+        }
+        
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length - 1; i++) {
+            const xc = (points[i].x + points[i + 1].x) / 2;
+            const yc = (points[i].y + points[i + 1].y) / 2;
+            ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+        }
+        ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+        ctx.stroke();
+        
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+    }
+
+    // ==================== HISTORY ====================
+    function addToHistory() {
+        if (state.historyIndex < state.history.length - 1) {
+            state.history = state.history.slice(0, state.historyIndex + 1);
+        }
+        state.history.push(JSON.parse(JSON.stringify(state.elements)));
+        state.historyIndex++;
+    }
+
+    function undo() {
+        if (state.historyIndex > 0) {
+            state.historyIndex--;
+            state.elements = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+            scheduleRender();
+            vibrate();
+        }
+    }
+
+    function redo() {
+        if (state.historyIndex < state.history.length - 1) {
+            state.historyIndex++;
+            state.elements = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+            scheduleRender();
+            vibrate();
+        }
+    }
+
+    // ==================== FIND ELEMENT UNDER MOUSE ====================
+    function findElementAt(x, y) {
+        const world = getWorld(x, y);
+        
+        // Check images first (they have higher priority for dragging)
+        for (let i = state.elements.length - 1; i >= 0; i--) {
+            const el = state.elements[i];
+            if (el.type === 'image') {
+                if (world.x >= el.x && world.x <= el.x + el.width &&
+                    world.y >= el.y && world.y <= el.y + el.height) {
+                    return { element: el, index: i };
+                }
+            }
+        }
+        return null;
+    }
+
+    // ==================== FIREBASE REALTIME ====================
+    function initRealtime() {
+        state.roomRef.child('boardColor').on('value', (snap) => {
+            const color = snap.val();
+            if (color) {
+                state.boardColor = color;
+                scheduleRender();
+            }
+        });
+
+        state.roomRef.child('password').on('value', (snap) => {
+            state.roomPassword = snap.val() || '';
+            state.hasPassword = !!state.roomPassword;
+        });
+
+        const activeRef = state.roomRef.child('active');
+        activeRef.on('child_added', (snap) => {
+            const data = snap.val();
+            if (data.userId !== state.userId) {
+                state.activePaths[snap.key] = data;
+                scheduleRender();
+            }
+        });
+        
+        activeRef.on('child_changed', (snap) => {
+            const data = snap.val();
+            if (data.userId !== state.userId) {
+                state.activePaths[snap.key] = data;
+                scheduleRender();
+            }
+        });
+        
+        activeRef.on('child_removed', (snap) => {
+            delete state.activePaths[snap.key];
+            scheduleRender();
+        });
+
+        state.roomRef.child('elements').on('child_added', (snap) => {
+            const el = snap.val();
+            state.elements.push(el);
+            
+            // Preload image if it's an image
+            if (el.type === 'image' && !imageCache.has(el.id)) {
+                const img = new Image();
+                img.src = el.data;
+                imageCache.set(el.id, img);
+            }
+            
+            scheduleRender();
+        });
+        
+        state.roomRef.child('elements').on('child_changed', (snap) => {
+            const updatedEl = snap.val();
+            const index = state.elements.findIndex(el => el.id === updatedEl.id);
+            if (index !== -1) {
+                state.elements[index] = updatedEl;
+                scheduleRender();
+            }
+        });
+        
+        state.roomRef.child('elements').on('child_removed', (snap) => {
+            const removedId = snap.val().id;
+            state.elements = state.elements.filter(el => el.id !== removedId);
+            imageCache.delete(removedId);
+            scheduleRender();
+        });
+
+        const presenceRef = state.roomRef.child('presence').child(state.userId);
+        presenceRef.onDisconnect().remove();
+        presenceRef.set({ online: true, name: 'User_' + state.userId.substr(-4) });
+
+        state.roomRef.child('presence').on('value', (snap) => {
+            const users = snap.val() || {};
+            state.userCount = Object.keys(users).length;
+            document.getElementById('menuUserCount').innerText = '+' + state.userCount;
+        });
+    }
+
+    // ==================== POINTER/TOUCH EVENTS ====================
+    canvas.addEventListener('touchstart', handlePointerStart);
+    canvas.addEventListener('mousedown', handlePointerStart);
+    
+    window.addEventListener('touchmove', handlePointerMove);
+    window.addEventListener('mousemove', handlePointerMove);
+    
+    window.addEventListener('touchend', handlePointerEnd);
+    window.addEventListener('mouseup', handlePointerEnd);
+    window.addEventListener('touchcancel', handlePointerCancel);
+
+    function handlePointerStart(e) {
+        e.preventDefault();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        
+        state.touchCount = e.touches ? e.touches.length : 1;
+        
+        // Long press for menu (mobile)
+        if (state.touchCount === 1 && isMobile) {
+            state.longPressTimer = setTimeout(() => {
+                toggleMoreMenu();
+                vibrate();
+            }, touchSettings.longPressDelay);
+        }
+        
+        // Double tap detection
+        const currentTime = new Date().getTime();
+        if (currentTime - state.lastTap < touchSettings.doubleTapDelay) {
+            state.scale = 2.5;
+            state.offset = { x: 0, y: 0 };
+            scheduleRender();
+            clearTimeout(state.longPressTimer);
+            vibrate();
+        }
+        state.lastTap = currentTime;
+        
+        // Check if we're clicking on an image
+        const hit = findElementAt(clientX, clientY);
+        if (hit && hit.element.type === 'image') {
+            state.isDraggingImage = true;
+            state.draggedImageId = hit.element.id;
+            const world = getWorld(clientX, clientY);
+            state.dragOffset = {
+                x: world.x - hit.element.x,
+                y: world.y - hit.element.y
+            };
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+        
+        // Otherwise start drawing
+        state.isDrawing = true;
+        const world = getWorld(clientX, clientY);
+        state.lastMouse = { x: clientX, y: clientY };
+
+        if (state.tool === 'text') {
+            showTextInput(clientX, clientY, world);
+            state.isDrawing = false;
+            return;
+        }
+
+        if (state.tool === 'draw' || state.tool === 'erase') {
+            const activeId = state.userId + '_' + Date.now();
+            const props = getPenProperties();
+            const color = state.tool === 'erase' ? state.boardColor : props.finalColor;
+            const size = (state.tool === 'erase' ? 30 : props.size) / state.scale;
+            
+            const pathData = {
+                userId: state.userId,
+                points: [world],
+                color: color,
+                size: size,
+                penType: penSettings.type
+            };
+            
+            state.roomRef.child('active').child(activeId).set(pathData);
+            state.activePaths[activeId] = pathData;
+        }
+    }
+
+    function handlePointerMove(e) {
+        e.preventDefault();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        
+        state.mousePos = { x: clientX, y: clientY };
+        
+        // Pinch zoom
+        if (e.touches && e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const distance = Math.hypot(dx, dy);
+            
+            if (state.pinchInitialDistance > 0) {
+                const scale = distance / state.pinchInitialDistance;
+                const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                const world = getWorld(centerX, centerY);
+                
+                state.scale *= scale;
+                state.scale = Math.max(0.2, Math.min(state.scale, 5));
+                
+                state.offset.x = centerX - world.x * state.scale;
+                state.offset.y = centerY - world.y * state.scale;
+                
+                state.pinchInitialDistance = distance;
+                scheduleRender();
+            }
+            return;
+        }
+        
+        // Dragging image
+        if (state.isDraggingImage && state.draggedImageId) {
+            const world = getWorld(clientX, clientY);
+            const imageEl = state.elements.find(el => el.id === state.draggedImageId);
+            if (imageEl) {
+                imageEl.x = world.x - state.dragOffset.x;
+                imageEl.y = world.y - state.dragOffset.y;
+                
+                // Update in Firebase
+                state.roomRef.child('elements').child(imageEl.firebaseKey).update({
+                    x: imageEl.x,
+                    y: imageEl.y
+                });
+                
+                scheduleRender();
+            }
+            return;
+        }
+        
+        // Pan tool
+        if (state.isDrawing && state.tool === 'pan') {
+            state.offset.x += (clientX - state.lastMouse.x);
+            state.offset.y += (clientY - state.lastMouse.y);
+            state.lastMouse = { x: clientX, y: clientY };
+            scheduleRender();
+            return;
+        }
+        
+        // Drawing
+        if (state.isDrawing && (state.tool === 'draw' || state.tool === 'erase')) {
+            const world = getWorld(clientX, clientY);
+            
+            const activeKeys = Object.keys(state.activePaths).filter(k => 
+                state.activePaths[k]?.userId === state.userId
+            );
+            
+            if (activeKeys.length > 0) {
+                const lastKey = activeKeys[activeKeys.length - 1];
+                const path = state.activePaths[lastKey];
+                if (!path) return;
+                
+                const lastPoint = path.points[path.points.length - 1];
+                
+                if (Math.hypot(world.x - lastPoint.x, world.y - lastPoint.y) > touchSettings.minDistance) {
+                    path.points.push(world);
+                    state.roomRef.child('active').child(lastKey).update({ points: path.points });
+                    scheduleRender();
+                }
+            }
+        }
+    }
+
+    function handlePointerEnd(e) {
+        clearTimeout(state.longPressTimer);
+        
+        // Stop dragging image
+        if (state.isDraggingImage) {
+            state.isDraggingImage = false;
+            state.draggedImageId = null;
+            canvas.style.cursor = 'crosshair';
+        }
+        
+        // Stop drawing
+        if (state.isDrawing && (state.tool === 'draw' || state.tool === 'erase')) {
+            const activeKeys = Object.keys(state.activePaths).filter(k => 
+                state.activePaths[k]?.userId === state.userId
+            );
+            
+            if (activeKeys.length > 0) {
+                const lastKey = activeKeys[activeKeys.length - 1];
+                const finalPath = state.activePaths[lastKey];
+                
+                if (finalPath?.points?.length > 1) {
+                    const newElement = {
+                        type: 'path',
+                        points: finalPath.points,
+                        color: finalPath.color,
+                        size: finalPath.size,
+                        penType: finalPath.penType
+                    };
+                    const newRef = state.roomRef.child('elements').push(newElement);
+                    // Store firebase key for future updates
+                    newElement.firebaseKey = newRef.key;
+                }
+                
+                state.roomRef.child('active').child(lastKey).remove();
+                delete state.activePaths[lastKey];
+            }
+        }
+        
+        state.isDrawing = false;
+        scheduleRender();
+        state.touchCount = 0;
+    }
+
+    function handlePointerCancel(e) {
+        clearTimeout(state.longPressTimer);
+        state.isDrawing = false;
+        state.isDraggingImage = false;
+        state.draggedImageId = null;
+        canvas.style.cursor = 'crosshair';
+        scheduleRender();
+    }
+
+    // ==================== TEXT INPUT ====================
+    function showTextInput(x, y, world) {
+        const input = document.getElementById('textInput');
+        input.style.display = 'block';
+        input.style.left = '50%';
+        input.style.top = '30%';
+        input.value = '';
+        input.focus();
+        
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter' && input.value.trim()) {
+                const newElement = {
+                    type: 'text',
+                    x: world.x,
+                    y: world.y,
+                    text: input.value,
+                    color: penSettings.color,
+                    size: 20
+                };
+                const newRef = state.roomRef.child('elements').push(newElement);
+                newElement.firebaseKey = newRef.key;
+                
+                input.style.display = 'none';
+                vibrate();
+            }
+        };
+    }
+
+    // ==================== ZOOM (DESKTOP) ====================
+    window.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const world = getWorld(e.clientX, e.clientY);
+        
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        state.scale *= delta;
+        state.scale = Math.max(0.2, Math.min(state.scale, 5));
+        
+        state.offset.x = e.clientX - world.x * state.scale;
+        state.offset.y = e.clientY - world.y * state.scale;
+        
+        scheduleRender();
+    }, { passive: false });
+
+    // ==================== UI FUNCTIONS ====================
+    function setTool(t) {
+        state.tool = t;
+        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-' + t).classList.add('active');
+        vibrate();
+    }
+
+    function togglePenTab() {
+        const penTab = document.getElementById('penTab');
+        penTab.classList.toggle('show');
+        document.getElementById('coordPanel').classList.remove('show');
+        document.getElementById('moreMenu').classList.remove('show');
+        vibrate();
+    }
+
+    function toggleCoordPanel() {
+        const coordPanel = document.getElementById('coordPanel');
+        coordPanel.classList.toggle('show');
+        document.getElementById('penTab').classList.remove('show');
+        document.getElementById('moreMenu').classList.remove('show');
+        vibrate();
+    }
+
+    function toggleMoreMenu() {
+        const moreMenu = document.getElementById('moreMenu');
+        moreMenu.classList.toggle('show');
+        document.getElementById('penTab').classList.remove('show');
+        document.getElementById('coordPanel').classList.remove('show');
+        vibrate();
+    }
+
+    function toggleFullScreen() {
+        state.fullScreen = !state.fullScreen;
+        document.body.classList.toggle('full-screen-mode', state.fullScreen);
+        document.querySelector('.fullscreen-btn i').setAttribute('data-lucide', state.fullScreen ? 'minimize-2' : 'maximize-2');
+        lucide.createIcons();
+        vibrate();
+    }
+
+    // ==================== MODALS ====================
+    function showCreateRoomModal() {
+        document.getElementById('createRoomModal').classList.add('show');
+        document.getElementById('roomPassword').style.display = 'none';
+        document.getElementById('enablePasswordCheckbox').checked = false;
+    }
+
+    function showJoinRoomModal() {
+        const roomId = document.getElementById('roomInput').value.trim();
+        if (!roomId) {
+            alert('Xona ID kiriting');
+            return;
+        }
+        document.getElementById('joinRoomName').innerText = roomId;
+        document.getElementById('joinRoomModal').classList.add('show');
+    }
+
+    function showDeleteRoomModal() {
+        if (!state.hasPassword) {
+            if (confirm('Xonani butunlay o\'chirishni xohlaysizmi?')) {
+                deleteRoom();
+            }
+        } else {
+            document.getElementById('deleteRoomModal').classList.add('show');
+            document.getElementById('deletePassword').value = '';
+        }
+        toggleMoreMenu();
+    }
+
+    function showExportModal() {
+        document.getElementById('exportModal').classList.add('show');
+        toggleMoreMenu();
+    }
+
+    function showRoomInfo() {
+        document.getElementById('infoRoomId').innerText = state.roomId;
+        document.getElementById('infoHasPassword').innerText = state.hasPassword ? 'Bor' : 'Yo\'q';
+        document.getElementById('infoUserCount').innerText = state.userCount;
+        document.getElementById('roomLinkCode').innerText = window.location.href;
+        document.getElementById('roomInfoModal').classList.add('show');
+        toggleMoreMenu();
+    }
+
+    function showClearPasswordModal() {
+        if (!state.hasPassword) {
+            if (confirm('Doskani tozalashni xohlaysizmi?')) {
+                clearBoard();
+            }
+        } else {
+            document.getElementById('passwordModal').classList.add('show');
+            document.getElementById('actionPassword').value = '';
+            toggleMoreMenu();
+        }
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('show');
+    }
+
+    // ==================== ROOM CREATION ====================
+    function createRoomWithPassword() {
+        const boardColor = document.getElementById('boardColorPicker').value;
+        const enablePassword = document.getElementById('enablePasswordCheckbox').checked;
+        const password = enablePassword ? document.getElementById('roomPassword').value : '';
+        
+        if (enablePassword && !password) {
+            alert('Parolni kiriting');
+            return;
+        }
+        
+        const id = 'MR' + Math.random().toString(36).substr(2, 8).toUpperCase();
+        window.location.hash = id;
+        initRoom(id, boardColor, password);
+        closeModal('createRoomModal');
+        vibrate();
+    }
+
+    function joinRoomWithPassword() {
+        const roomId = document.getElementById('roomInput').value.trim();
+        const password = document.getElementById('joinPassword').value;
+        
+        const roomRef = db.ref('rooms_v12/' + roomId);
+        roomRef.child('password').once('value', (snap) => {
+            const roomPassword = snap.val() || '';
+            
+            if (roomPassword && roomPassword !== password) {
+                alert('Parol noto\'g\'ri');
+                return;
+            }
+            
+            window.location.hash = roomId;
+            closeModal('joinRoomModal');
+        });
+    }
+
+    function verifyPasswordAndClear() {
+        const enteredPassword = document.getElementById('actionPassword').value;
+        
+        if (enteredPassword === state.roomPassword) {
+            closeModal('passwordModal');
+            if (confirm('Doskani tozalashni xohlaysizmi?')) {
+                clearBoard();
+            }
+        } else {
+            alert('Parol noto\'g\'ri');
+        }
+    }
+
+    function verifyPasswordAndDelete() {
+        const enteredPassword = document.getElementById('deletePassword').value;
+        
+        if (enteredPassword === state.roomPassword) {
+            closeModal('deleteRoomModal');
+            deleteRoom();
+        } else {
+            alert('Parol noto\'g\'ri');
+        }
+    }
+
+    function deleteRoom() {
+        state.roomRef.remove()
+            .then(() => {
+                alert('Xona o\'chirildi');
+                window.location.hash = '';
+                location.reload();
+            })
+            .catch((error) => {
+                alert('Xatolik: ' + error.message);
+            });
+    }
+
+    function clearBoard() {
+        state.roomRef.child('elements').remove();
+        imageCache.clear();
+        vibrate();
+    }
+
+    function initRoom(roomId, boardColor = null, password = '') {
+        state.roomId = roomId;
+        state.roomRef = db.ref('rooms_v12/' + roomId);
+        state.elements = [];
+        state.activePaths = {};
+        imageCache.clear();
+        
+        if (boardColor) {
+            state.roomRef.child('boardColor').set(boardColor);
+            state.boardColor = boardColor;
+        }
+        
+        if (password) {
+            state.roomRef.child('password').set(password);
+            state.hasPassword = true;
+            state.roomPassword = password;
+        }
+        
+        document.getElementById('roomDisplay').innerText = roomId;
+        document.getElementById('welcome-page').style.display = 'none';
+        document.getElementById('app-page').style.display = 'block';
+        
+        initRealtime();
+        resize();
+    }
+
+    // ==================== EXPORT ====================
+    function exportAsPNG() {
+        const name = document.getElementById('exportName').value || 'drawing';
+        const link = document.createElement('a');
+        link.download = name + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        closeModal('exportModal');
+        vibrate();
+    }
+
+    function exportAsJPG() {
+        const name = document.getElementById('exportName').value || 'drawing';
+        const link = document.createElement('a');
+        link.download = name + '.jpg';
+        link.href = canvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+        closeModal('exportModal');
+        vibrate();
+    }
+
+    // ==================== COPY ====================
+    function copyRoomId() {
+        navigator.clipboard.writeText(state.roomId);
+        alert('Xona ID nusxalandi: ' + state.roomId);
+        vibrate();
+    }
+
+    function copyRoomLink() {
+        navigator.clipboard.writeText(window.location.href);
+        alert('Link nusxalandi');
+        closeModal('roomInfoModal');
+        vibrate();
+    }
+
+    function copyRoomLinkFromBox() {
+        navigator.clipboard.writeText(window.location.href);
+        alert('Link nusxalandi');
+        vibrate();
+    }
+
+    // ==================== EXIT ====================
+    function exitToHome() {
+        if (confirm('Chiqishni xohlaysizmi?')) {
+            window.location.hash = '';
+            location.reload();
+        }
+    }
+
+    // ==================== HASH CHANGE ====================
+    window.addEventListener('hashchange', () => {
+        const hash = window.location.hash.substring(1);
+        if (hash) initRoom(hash);
+    });
+
+    if (window.location.hash.substring(1)) {
+        initRoom(window.location.hash.substring(1));
+    }
+
+    // ==================== CLOSE HANDLERS ====================
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.getElementById('textInput').style.display = 'none';
+            document.getElementById('penTab').classList.remove('show');
+            document.getElementById('coordPanel').classList.remove('show');
+            document.getElementById('moreMenu').classList.remove('show');
+            closeModal('exportModal');
+            closeModal('roomInfoModal');
+            closeModal('createRoomModal');
+            closeModal('joinRoomModal');
+            closeModal('passwordModal');
+            closeModal('deleteRoomModal');
+            closeTextSizeModal();
+        }
+    });
+
+    window.addEventListener('click', (e) => {
+        if (!e.target.closest('.menu-btn') && !e.target.closest('#penTab') && !e.target.closest('#coordPanel') && !e.target.closest('#moreMenu') && !e.target.closest('.room-box')) {
+            document.getElementById('penTab').classList.remove('show');
+            document.getElementById('coordPanel').classList.remove('show');
+            document.getElementById('moreMenu').classList.remove('show');
+        }
+    });
+
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+</script>
+</body>
+</html>
+
